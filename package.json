@@ -20,7 +20,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "bun test",
+    "test": "bun test ./test/",
     "build": "bun build src/index.ts --target=bun --outdir=dist --format=esm && bun x tsc --emitDeclarationOnly --outDir dist",
     "prepublishOnly": "make ci"
   },

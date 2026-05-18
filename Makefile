@@ -4,7 +4,7 @@ install:
 	bun install
 
 test:
-	bun test
+	bun test ./test/
 
 build:
 	bun build src/index.ts --target=bun --outdir=dist --format=esm
