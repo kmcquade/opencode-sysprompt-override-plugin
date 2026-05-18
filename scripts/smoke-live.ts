@@ -123,6 +123,9 @@ try {
         OPENCODE_NO_AUTO_UPDATE: "1",
       },
       timeout: TIMEOUT_MS,
+      // Provide empty stdin so opencode's `Bun.stdin.text()` gets EOF immediately
+      // instead of hanging waiting for input.
+      input: "",
       stdio: "pipe",
       encoding: "utf8",
     },
