@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "opencode-sysprompt-override config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "lenient": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, errors warn-and-skip silently instead of injecting a visible policy-error block into the system prompt. Logs are always written."
+    },
+    "default": {
+      "$ref": "#/definitions/RuleBody",
+      "description": "Rule applied when no explicit rule matched. No `match` field."
+    },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Rule" }
+    }
+  },
+  "definitions": {
+    "MatchSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "providerID": { "type": "string" },
+        "providerIDGlob": { "type": "string" },
+        "modelID": { "type": "string" },
+        "modelIDGlob": { "type": "string" }
+      }
+    },
+    "RuleBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["append", "replace"] },
+        "position": { "type": "string", "enum": ["start", "end"], "default": "end" },
+        "prompt": { "type": "string" },
+        "promptFile": { "type": "string" }
+      },
+      "oneOf": [
+        { "required": ["prompt"], "not": { "required": ["promptFile"] } },
+        { "required": ["promptFile"], "not": { "required": ["prompt"] } }
+      ]
+    },
+    "Rule": {
+      "allOf": [
+        { "$ref": "#/definitions/RuleBody" },
+        {
+          "type": "object",
+          "properties": {
+            "match": { "$ref": "#/definitions/MatchSpec" }
+          }
+        }
+      ]
+    }
+  }
+}
