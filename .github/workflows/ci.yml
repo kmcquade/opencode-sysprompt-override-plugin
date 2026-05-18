@@ -14,3 +14,19 @@ jobs:
         with:
           bun-version: latest
       - run: make ci
+
+  smoke-mock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Install opencode CLI
+        run: curl -fsSL https://opencode.ai/install | bash
+      - name: Install dependencies
+        run: make install
+      - name: Build bundle
+        run: make build
+      - name: Run smoke-mock
+        run: make smoke-mock
