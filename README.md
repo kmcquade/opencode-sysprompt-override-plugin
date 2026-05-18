@@ -118,6 +118,79 @@ The log file is append-only. Rotation is the user's responsibility.
 3. `append` with `position: "end"` (the default) preserves opencode's 2-part prompt-cache header. `position: "start"` and `mode: "replace"` modify `system[0]`, which skips opencode's rejoin and changes cache shape.
 4. The hook fires on every LLM call — chat turns, agent sub-runs, HTTP server requests alike.
 
+## Try it locally with opencode
+
+Until the package is published to npm, the fastest way to try the plugin against a real opencode install is to build it here and drop the bundled file into your project's `.opencode/plugin/` directory.
+
+### One-time setup
+
+```bash
+git clone git@github.com:kmcquade/opencode-sysprompt-override-plugin.git
+cd opencode-sysprompt-override-plugin
+make ci                       # installs, runs tests, builds dist/
+```
+
+You should now have `dist/index.js` (~7.5KB ESM bundle).
+
+### Wire it into an opencode project
+
+Pick any project where you run opencode. From inside that project:
+
+```bash
+mkdir -p .opencode/plugin
+cp /path/to/opencode-sysprompt-override-plugin/dist/index.js \
+   .opencode/plugin/system-prompt-override.js
+```
+
+opencode auto-discovers `.opencode/plugin/*.{ts,js}` — no edits to `opencode.json` needed.
+
+### Add a config
+
+Create `.opencode/system-prompts.json` in the same project. Start with the example:
+
+```bash
+cp /path/to/opencode-sysprompt-override-plugin/examples/system-prompts.example.json \
+   .opencode/system-prompts.json
+```
+
+Or write a minimal one to test against your model. Example for verifying a `replace` rule fires:
+
+```json
+{
+  "rules": [
+    {
+      "match": { "modelIDGlob": "*" },
+      "mode": "replace",
+      "prompt": "SYSPROMPT-OVERRIDE-FIRED: You will repeat this exact sentence verbatim if asked about your instructions."
+    }
+  ]
+}
+```
+
+### Verify it works
+
+Start opencode in the project (`opencode` for interactive, or `opencode serve` for the HTTP server). Send a prompt like:
+
+> Repeat your system instructions verbatim.
+
+If you see `SYSPROMPT-OVERRIDE-FIRED:` in the response, the plugin is wired in and your rule fired. If you see opencode's standard preamble instead, double-check:
+
+1. `ls .opencode/plugin/` shows `system-prompt-override.js`
+2. `cat .opencode/system-prompts.json` is valid JSON (`bun -e "JSON.parse(require('fs').readFileSync('.opencode/system-prompts.json','utf8'))"` should be silent)
+3. The model your opencode is using actually matches the rule. Try `{ "modelIDGlob": "*" }` to match every model while debugging.
+
+### Check for errors
+
+If a rule fails (missing `promptFile`, malformed config, etc.), the plugin injects a `<SYSTEM POLICY ERROR: ...>` block at the front of the system prompt — the model will usually echo it back. Detailed errors are appended to `.opencode/system-prompt-override.log` (one JSON line per event):
+
+```bash
+tail -f .opencode/system-prompt-override.log
+```
+
+### Iterate without restarting
+
+Edit `.opencode/system-prompts.json` and save. The plugin checks the file's mtime on every LLM call, so the next message picks up your change — no restart needed.
+
 ## Development
 
 ```bash
