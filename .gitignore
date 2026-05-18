@@ -48,3 +48,8 @@ dist/
 
 # Local logs
 system-prompt-override.log
+
+# Secrets
+.env
+.env.local
+.env.*.local
