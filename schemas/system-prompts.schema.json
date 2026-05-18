@@ -46,14 +46,19 @@
       ]
     },
     "Rule": {
-      "allOf": [
-        { "$ref": "#/definitions/RuleBody" },
-        {
-          "type": "object",
-          "properties": {
-            "match": { "$ref": "#/definitions/MatchSpec" }
-          }
-        }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "match": { "$ref": "#/definitions/MatchSpec" },
+        "mode": { "type": "string", "enum": ["append", "replace"] },
+        "position": { "type": "string", "enum": ["start", "end"], "default": "end" },
+        "prompt": { "type": "string" },
+        "promptFile": { "type": "string" }
+      },
+      "oneOf": [
+        { "required": ["prompt"], "not": { "required": ["promptFile"] } },
+        { "required": ["promptFile"], "not": { "required": ["prompt"] } }
       ]
     }
   }
