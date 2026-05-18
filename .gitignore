@@ -49,6 +49,9 @@ dist/
 # Local logs
 system-prompt-override.log
 
+# opencode local state (sessions, vendored plugins, etc)
+.opencode/
+
 # Secrets
 .env
 .env.local
