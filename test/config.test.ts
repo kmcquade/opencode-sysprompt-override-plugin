@@ -86,6 +86,32 @@ describe("loadConfigIfChanged", () => {
     expect(loaded!.errors[0]!.code).toBe("rule-invalid")
   })
 
+  it("captures rule-invalid for scalar match (e.g. \"match\": \"qwen*\")", () => {
+    writeFileSync(configPath, JSON.stringify({
+      rules: [{ match: "qwen*", mode: "append", prompt: "x" }],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    expect(loaded!.errors[0]!.code).toBe("rule-invalid")
+    expect(loaded!.errors[0]!.message).toContain("match")
+  })
+
+  it("captures rule-invalid for array match", () => {
+    writeFileSync(configPath, JSON.stringify({
+      rules: [{ match: ["qwen"], mode: "append", prompt: "x" }],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    expect(loaded!.errors[0]!.code).toBe("rule-invalid")
+  })
+
+  it("captures rule-invalid for unknown position", () => {
+    writeFileSync(configPath, JSON.stringify({
+      rules: [{ mode: "append", position: "middle", prompt: "x" }],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    expect(loaded!.errors[0]!.code).toBe("rule-invalid")
+    expect(loaded!.errors[0]!.message).toContain("position")
+  })
+
   it("parses default rule when present", () => {
     writeFileSync(configPath, JSON.stringify({
       default: { mode: "append", prompt: "fallback" },

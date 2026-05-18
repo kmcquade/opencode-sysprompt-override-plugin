@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { reportError, type ErrorContext } from "../src/errors"
+import { reportError, flushErrors, type ErrorContext } from "../src/errors"
 
 let tmp: string
 let logPath: string
@@ -15,6 +15,7 @@ function makeCtx(lenient: boolean): ErrorContext {
     configPath: "/fake/config.json",
     output,
     seen: new Set(),
+    pendingBlocks: [],
   }
 }
 
@@ -32,6 +33,7 @@ describe("reportError fail-loud (default)", () => {
   it("prepends a SYSTEM POLICY ERROR block to output.system", () => {
     const ctx = makeCtx(false)
     reportError(ctx, "bad-thing", "something went wrong")
+    flushErrors(ctx)
     expect(output.system.length).toBe(2)
     expect(output.system[0]).toContain("<SYSTEM POLICY ERROR: bad-thing: something went wrong>")
     expect(output.system[1]).toBe("original")
@@ -50,6 +52,7 @@ describe("reportError fail-loud (default)", () => {
     const ctx = makeCtx(false)
     reportError(ctx, "bad", "m")
     reportError(ctx, "bad", "m")
+    flushErrors(ctx)
     const blocks = output.system.filter((s) => s.startsWith("<SYSTEM POLICY ERROR"))
     expect(blocks.length).toBe(2)
   })
@@ -75,6 +78,7 @@ describe("reportError lenient", () => {
   it("does NOT inject into output.system", () => {
     const ctx = makeCtx(true)
     reportError(ctx, "bad", "m")
+    flushErrors(ctx)
     expect(output.system).toEqual(["original"])
   })
 
@@ -82,5 +86,18 @@ describe("reportError lenient", () => {
     const ctx = makeCtx(true)
     reportError(ctx, "bad", "m")
     expect(existsSync(logPath)).toBe(true)
+  })
+})
+
+describe("flushErrors deferred injection", () => {
+  it("error block survives a subsequent replace mutation on output.system (fail-loud)", () => {
+    const ctx = makeCtx(false)
+    reportError(ctx, "bad", "m")
+    // Simulate a `replace` rule wiping output.system
+    ctx.output.system.splice(0, ctx.output.system.length, "REPLACEMENT")
+    // Then flush — error block must still appear
+    flushErrors(ctx)
+    expect(output.system[0]).toContain("<SYSTEM POLICY ERROR")
+    expect(output.system).toContain("REPLACEMENT")
   })
 })

@@ -156,6 +156,24 @@ describe("plugin end-to-end", () => {
     expect(output.system).toContain("original")
   })
 
+  it("default does not fire when an explicit rule matched but failed to resolve promptFile", async () => {
+    writeFileSync(configPath, JSON.stringify({
+      lenient: true,  // suppress visible error block so we can assert cleanly on output.system
+      default: { mode: "append", prompt: "DEFAULT-SHOULD-NOT-APPEAR" },
+      rules: [
+        { match: { modelIDGlob: "qwen*" }, mode: "replace", promptFile: "./missing.md" },
+      ],
+    }))
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: ["original"] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system).not.toContain("DEFAULT-SHOULD-NOT-APPEAR")
+    expect(output.system).toEqual(["original"])
+  })
+
   it("no config file: silent no-op", async () => {
     const hooks = await plugin(fakeCtx(tmp))
     const output = { system: ["original"] }

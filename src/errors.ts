@@ -7,6 +7,7 @@ export interface ErrorContext {
   configPath?: string
   output: { system: string[] }
   seen: Set<string>
+  pendingBlocks: string[]
 }
 
 export function reportError(
@@ -39,6 +40,12 @@ export function reportError(
       `<SYSTEM POLICY ERROR: ${code}: ${message}>\n` +
       `The opencode-sysprompt-override plugin failed to apply this rule. ` +
       `See ${ctx.logPath} for details.`
-    ctx.output.system.unshift(block)
+    ctx.pendingBlocks.push(block)
   }
+}
+
+export function flushErrors(ctx: ErrorContext): void {
+  if (ctx.pendingBlocks.length === 0) return
+  ctx.output.system.unshift(...ctx.pendingBlocks)
+  ctx.pendingBlocks.length = 0
 }

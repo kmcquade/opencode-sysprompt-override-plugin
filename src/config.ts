@@ -92,6 +92,12 @@ function parseRule(rule: Rule, index: number): ParsedRule {
   if (rule.mode !== "append" && rule.mode !== "replace") {
     throw new Error(`unknown mode: ${String((rule as { mode: unknown }).mode)}`)
   }
+  if (rule.match !== undefined && (typeof rule.match !== "object" || rule.match === null || Array.isArray(rule.match))) {
+    throw new Error(`match must be an object`)
+  }
+  if (rule.position !== undefined && rule.position !== "start" && rule.position !== "end") {
+    throw new Error(`unknown position: ${String((rule as { position: unknown }).position)}`)
+  }
   const hasPrompt = typeof rule.prompt === "string"
   const hasFile = typeof rule.promptFile === "string"
   if (hasPrompt === hasFile) {

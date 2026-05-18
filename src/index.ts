@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { loadConfigIfChanged, resolvePromptText } from "./config"
 import { matches } from "./match"
 import { applyRule } from "./apply"
-import { reportError, type ErrorContext } from "./errors"
+import { reportError, flushErrors, type ErrorContext } from "./errors"
 import type { ModelLike, ParsedRule } from "./types"
 
 const plugin: Plugin = async (ctx) => {
@@ -38,6 +38,7 @@ function transform(
     configPath: loaded.path,
     output,
     seen: loaded.seen,
+    pendingBlocks: [],
   }
 
   for (const e of loaded.errors) {
@@ -46,7 +47,6 @@ function transform(
 
   const matched: ParsedRule[] = loaded.parsedRules.filter((r) => matches(r, model))
 
-  let anyApplied = false
   for (const rule of matched) {
     let text: string
     try {
@@ -56,19 +56,21 @@ function transform(
       continue
     }
     applyRule(rule, text, output)
-    anyApplied = true
   }
 
-  if (!anyApplied && loaded.parsedDefault) {
+  if (matched.length === 0 && loaded.parsedDefault) {
     let text: string
     try {
       text = resolvePromptText(loaded.parsedDefault, loaded.dir)
     } catch (err) {
       reportError(errCtx, "default-promptfile-error", String(err))
+      flushErrors(errCtx)
       return
     }
     applyRule(loaded.parsedDefault, text, output)
   }
+
+  flushErrors(errCtx)
 }
 
 export default plugin
