@@ -11,7 +11,9 @@
 | Distribution | Publishable npm package |
 | Runtime target | Bun (matches opencode) |
 | Runtime dependencies | Zero |
+| Config format | Strict JSON only — no JSONC |
 | Wildcard matching in v1 | Yes — glob (`*`, `?`) only; no regex |
+| Error model | Fail-loud by default; `"lenient": true` opts into warn-and-skip |
 | Test depth | Unit + integration (no opencode dev dep) |
 | CI principle | Local-CI parity — GH Actions wraps `make` targets, nothing else |
 
@@ -31,20 +33,23 @@ Package name: `opencode-sysprompt-override` (unscoped). Initial version: `0.1.0`
 ```
 src/
 ├── index.ts        # plugin factory; wires the hook handler
-├── config.ts       # discovery, load, mtime cache, JSONC stripping
+├── config.ts       # discovery, load (JSON.parse), mtime cache, schema validation
 ├── match.ts        # rule matching: exact + glob, AND-semantics
 ├── apply.ts        # mutation: replace, append at start/end
-└── glob.ts         # tiny glob → RegExp (~10 lines)
+├── glob.ts         # tiny glob → RegExp (~10 lines)
+├── errors.ts       # fail-loud vs lenient: inject SYSTEM POLICY ERROR blocks, write log file
+└── log.ts          # append-only log file writer (~/.opencode/system-prompt-override.log)
 
 test/
 ├── match.test.ts
 ├── apply.test.ts
 ├── config.test.ts
 ├── glob.test.ts
+├── errors.test.ts        # fail-loud injection, lenient skip, log writes
 └── integration.test.ts   # invokes the built plugin against a synthetic Provider.Model
 
 schemas/system-prompts.schema.json
-examples/system-prompts.example.jsonc
+examples/system-prompts.example.json
 package.json
 tsconfig.json
 bunfig.toml
@@ -79,18 +84,30 @@ Each module has one job and is independently testable. `glob.ts` is its own file
 
 ## Config schema additions over `SPEC.md`
 
-Add glob fields:
+### Glob fields
 
-```jsonc
+```json
 {
   "match": {
     "providerID": "exact-match",
     "providerIDGlob": "anthropic*",
-    "modelID": "exact-match",      // compared against model.id at runtime
+    "modelID": "exact-match",
     "modelIDGlob": "qwen*"
   }
 }
 ```
+
+### Root-level `lenient` flag
+
+```json
+{
+  "lenient": false,
+  "default": { "mode": "append", "prompt": "..." },
+  "rules": [ ... ]
+}
+```
+
+Default is `false` (fail-loud). Set to `true` to opt into warn-and-skip behavior described in the Error Handling section.
 
 Semantics:
 
@@ -113,36 +130,55 @@ export function globToRegex(pattern: string): RegExp {
 
 Compiled `RegExp`s are cached on the parsed rule so we don't recompile per LLM call.
 
-## JSONC stripping
+## Config format: strict JSON only
 
-Hand-rolled in `src/config.ts`. Acceptable for short plugin configs; switch to `jsonc-parser` if anyone hits an edge case.
+**No JSONC support.** Configs are parsed with `JSON.parse` directly. Rationale: a regex-based JSONC stripper corrupts inline prompts containing `//`, `https://`, or `/* */` — exactly the content users routinely put in prompts. A real JSONC parser would add a runtime dep. JSON is good enough: users who want long, documented prompts move them to a `promptFile`, where the content can be anything.
 
-```ts
-function stripJsonc(text: string): string {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, "")       // block comments
-    .replace(/(^|[^:"'])\/\/.*$/gm, "$1")    // line comments (avoid URLs)
-}
+The example file is `system-prompts.example.json`. No `.jsonc` extension is recognized.
+
+## Error handling: fail-loud by default
+
+The plugin's job is to enforce custom system instructions. Silent failure means a security overlay or `replace` rule can disappear and the operator never finds out — exactly the failure mode Codex flagged. Default behavior is therefore **fail-loud**: every error injects a clearly-formatted `<SYSTEM POLICY ERROR>` block into `output.system` so it surfaces in the chat, and writes to a durable log file.
+
+Users who specifically want quiet behavior (active development, intentional rule omission) opt in via `"lenient": true` at the config root.
+
+### Behavior matrix
+
+| Condition | Default (fail-loud) | `"lenient": true` |
+|---|---|---|
+| No config file found | Silent no-op (this is the default state, not an error) | Same |
+| Config file unreadable | Inject `<SYSTEM POLICY ERROR: cannot read $path: $reason>`, log, no rules applied | `console.warn` once, no-op |
+| Malformed JSON | Inject `<SYSTEM POLICY ERROR: invalid JSON in $path: $reason>`, log, no rules applied | Warn once, no-op |
+| Rule with both `prompt` and `promptFile`, or neither | Inject `<SYSTEM POLICY ERROR: rule[$i] invalid shape: ...>`, log, skip rule, apply others | Warn with rule index, skip rule |
+| `promptFile` missing or unreadable | Inject `<SYSTEM POLICY ERROR: rule[$i] promptFile $path: $reason>`, log, skip rule, apply others | Warn with path, skip rule |
+| Unknown `mode` | Inject `<SYSTEM POLICY ERROR: rule[$i] unknown mode $mode>`, log, skip rule, apply others | Warn with rule index, skip rule |
+| Bad glob (regex compile fails) | Inject `<SYSTEM POLICY ERROR: rule[$i] bad glob $pattern: $reason>`, log, skip rule, apply others | Warn with pattern, skip rule |
+| Hook handler throws unexpectedly | Caught at top of handler; inject `<SYSTEM POLICY ERROR: handler crash: $reason>`, log; remaining rules not applied | Caught, warn, no-op for that call |
+
+The hook handler is always wrapped in a try/catch — neither mode lets exceptions escape to opencode (that would surface as a chat error from opencode itself, which is worse than our controlled error block).
+
+### Error block format
+
+Each error is prepended to `output.system` as a separate entry so it's visible at the start of the system prompt:
+
+```
+<SYSTEM POLICY ERROR: rule[2] promptFile ./prompts/security.md: ENOENT>
+The opencode-sysprompt-override plugin failed to apply this rule. See ~/.opencode/system-prompt-override.log for details.
 ```
 
-Known limitation: `//` inside a JSON string value is mishandled. Acceptable for v1.
+`unshift`ing the error means `system[0]` is mutated, which intentionally breaks opencode's prompt-cache rejoin — operators get cache-shape evidence of policy failure on top of the visible message. Cache breakage is the correct cost for a broken policy.
 
-## Error handling
+In `lenient` mode, error blocks are not injected; only the log file and `console.warn` capture the failure.
 
-Everything degrades to a `console.warn` + skip. The hook handler is wrapped in a try/catch so unexpected throws don't surface as opencode chat errors.
+### Log file
 
-| Condition | Behavior |
-|---|---|
-| No config file found | Silent no-op |
-| Config file unreadable | Warn once, no-op |
-| Malformed JSON/JSONC | Warn once, no-op |
-| Rule with both `prompt` and `promptFile`, or neither | Warn with rule index, skip rule |
-| `promptFile` missing or unreadable | Warn with path, skip rule |
-| Unknown `mode` | Warn with rule index, skip rule |
-| Bad glob (regex compile fails) | Warn with pattern, skip rule |
-| Hook handler throws unexpectedly | Caught, warn, no-op for that call |
+Always-on, regardless of `lenient` setting. Location: `<config-dir>/system-prompt-override.log`, where `<config-dir>` is the directory the active config was loaded from (project `.opencode/` or `~/.opencode/`). Format: one JSON line per error event with `timestamp`, `path`, `ruleIndex` (if applicable), `code`, `message`.
 
-Warnings include the config path and rule index where applicable. Each unique warning fires at most once per config load (deduped on `(message, path)`) so logs aren't spammed on every LLM call.
+Append-only. Users are responsible for rotation. v1 does not cap log size.
+
+### Warning de-duplication
+
+Within a single config load, identical errors fire once per `(code, path, ruleIndex)` key to avoid log spam on every LLM call. The dedupe cache is reset when the config file's mtime changes (because the user has likely fixed or changed the problem).
 
 ## Testing strategy
 
@@ -150,7 +186,7 @@ Warnings include the config path and rule index where applicable. Each unique wa
 
 - `match.test.ts` — exact `providerID`/`modelID`, glob variants, AND semantics, empty `match` matches everything.
 - `apply.test.ts` — append-end, append-start, replace, multiple rules stacking, replace-then-append sequence.
-- `config.test.ts` — discovery order (env var > project `.opencode/` > `~/.config/opencode/` > `~/.opencode/`), JSONC comment stripping, mtime cache hit/miss, malformed JSON warns and returns null.
+- `config.test.ts` — discovery order (env var > project `.opencode/` > `~/.config/opencode/` > `~/.opencode/`), mtime cache hit/miss, JSON-only parsing (a `.jsonc` file with comments is treated as malformed). Includes tests with inline prompts containing `https://`, `//`, and `/* ... */` to confirm `JSON.parse` handles them correctly.
 - `glob.test.ts` — `*`, `?`, literal regex metacharacters escaped, anchored full-string match.
 
 ### Integration test
@@ -168,10 +204,11 @@ const model = {
 }
 ```
 
-Two scenarios:
+Three scenarios:
 
 1. **Happy path:** explicit qwen rule + `default` rule → only qwen rule fires; `default` is skipped.
 2. **Replace then append:** qwen replace rule + global append rule (no `match`) → both apply in order; `output.system` ends up as `[replaced, appended]`.
+3. **Fail-loud on broken rule:** a rule with a missing `promptFile` → `<SYSTEM POLICY ERROR>` block is prepended; valid sibling rules still apply; log file at `<config-dir>/system-prompt-override.log` gains one JSON line. Same scenario with `"lenient": true` → no error block injected; log file still gets the line.
 
 This exercises the real plugin entry point, real config loading, real glob matching, and real file I/O. The only synthesized things are the `Model` object and the empty `output.system` — which is exactly what opencode itself supplies at the call site.
 
@@ -247,6 +284,13 @@ Manual, low-cadence, single-maintainer:
 
 No automated release workflow in v1.
 
+## Changes from Codex adversarial review (2026-05-18)
+
+Codex flagged two `[high]` issues against an earlier revision of this document. Both are now addressed:
+
+1. **Regex-based JSONC stripping would corrupt inline prompts containing `//`, `https://`, or `/* */`.** Resolution: dropped JSONC entirely. `JSON.parse` only. Users who want long, documented prompts use `promptFile`. See "Config format: strict JSON only" above.
+2. **Fail-open error model could silently disable security-critical overrides.** Resolution: default is now fail-loud — every error injects a visible `<SYSTEM POLICY ERROR>` block into `output.system` and writes to an append-only log file. `"lenient": true` is the explicit opt-out for development use. See "Error handling: fail-loud by default" above.
+
 ## Out of scope for v1
 
 - Regex matching (`modelIDRegex`, `providerIDRegex`) — glob covers the immediate need; revisit if asked.
@@ -266,6 +310,7 @@ This is a sketch for the writing-plans skill, not a binding sequence:
 5. `src/config.ts` + `test/config.test.ts` — discovery, JSONC, mtime cache.
 6. `src/index.ts` — wires everything; exports the plugin factory.
 7. `test/integration.test.ts` — uses the built plugin.
-8. `schemas/system-prompts.schema.json`, `examples/system-prompts.example.jsonc`.
-9. `.github/workflows/ci.yml`.
-10. `README.md` — install, config, drop-in instructions, caveats from `SPEC.md`.
+8. `src/log.ts` + `src/errors.ts` + `test/errors.test.ts` — error injection and log writes.
+9. `schemas/system-prompts.schema.json`, `examples/system-prompts.example.json`.
+10. `.github/workflows/ci.yml`.
+11. `README.md` — install, config, drop-in instructions, error model (fail-loud default), caveats from `SPEC.md`.
