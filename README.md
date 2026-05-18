@@ -70,7 +70,7 @@ Two paths. The demo above used path A.
 
 **B. npm:**
 ```bash
-npm install opencode-sysprompt-override
+npm install -g opencode-sysprompt-override
 ```
 Then in your `opencode.json`:
 ```json
