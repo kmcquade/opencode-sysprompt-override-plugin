@@ -45,6 +45,8 @@ Now run `opencode` in that directory and type:
 
 Claude will reply: **Are Sandwiches.**
 
+<img width="571" height="416" alt="image" src="https://github.com/user-attachments/assets/abcb49d1-39ff-4608-a1a9-e6d173316c33" />
+
 Want to undo it? Delete `.opencode/plugin/system-prompt-override.js`. Want to change the rule? Edit `.opencode/system-prompts.json` — the next message picks up the change, no restart.
 
 ## What this is actually for
