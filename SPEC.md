@@ -163,23 +163,25 @@ Use `input.directory` as the base when looking up the user's config file.
 
 ## Configuration design
 
-The plugin reads a config file. Default lookup order:
+The plugin reads a config file. **Strict JSON only — no JSONC, no comments.** A regex-based JSONC stripper would corrupt inline prompts containing `//`, `https://`, or `/* */`. Users who want long, documented prompts move them to a `promptFile`.
+
+Default lookup order:
 
 1. `OPENCODE_SYSTEM_PROMPT_CONFIG` environment variable (absolute path)
 2. `<input.directory>/.opencode/system-prompts.json` (project-local, preferred)
-3. `<input.directory>/.opencode/system-prompts.jsonc` (allow comments)
-4. `~/.config/opencode/system-prompts.json` (user-global fallback)
-5. `~/.opencode/system-prompts.json` (alt user-global; matches opencode's own walk)
+3. `~/.config/opencode/system-prompts.json` (user-global fallback)
+4. `~/.opencode/system-prompts.json` (alt user-global; matches opencode's own walk)
 
-If none exist, the plugin is a no-op. **Never throw.**
+If none exist, the plugin is a no-op. The hook handler is wrapped in a try/catch so unexpected throws never escape to opencode (which would surface them as chat errors).
 
 ### Config schema
 
 The user-facing config uses `modelID` as the field name (friendlier, matches the spec's mental model), and the plugin maps it to the runtime field `model.id` internally. `providerID` is unchanged.
 
-```jsonc
+```json
 {
   "$schema": "./system-prompts.schema.json",
+  "lenient": false,
   "default": {
     "mode": "append",
     "prompt": "Always be concise."
@@ -216,8 +218,12 @@ The user-facing config uses `modelID` as the field name (friendlier, matches the
 - Comparison is **exact string match** for v1. (See stretch goal below.)
 - Rules are evaluated in declared order. **All matching explicit rules apply, in order.**
 - A `mode: "replace"` rule wipes `output.system` first, then writes its prompt. Subsequent matching rules apply on top.
-- **`default` runs only when no explicit rule matched.** (This is a deliberate change from the earlier draft — see "Design decisions" below.)
-- Invalid rule → log a clear warning and skip that rule. Never crash opencode.
+- **`default` runs only when no explicit rule matched.** (Deliberate choice — see "Design decisions" below.)
+- Invalid rule → fail-loud by default (see error model below). Never crash opencode.
+
+### Root-level `lenient` flag
+
+Optional, defaults to `false`. Controls the error model — see the design doc and the README for the full behavior matrix. Short version: by default, config/rule errors inject a visible `<SYSTEM POLICY ERROR>` block into the system prompt and write to a log file. `"lenient": true` suppresses the injected blocks (warn + skip instead), preserving the log file.
 
 ### Stretch goal (not required for v1)
 
@@ -386,31 +392,31 @@ function configCandidates(projectDir: string): string[] {
   return [
     env,
     join(projectDir, ".opencode", "system-prompts.json"),
-    join(projectDir, ".opencode", "system-prompts.jsonc"),
     join(homedir(), ".config", "opencode", "system-prompts.json"),
     join(homedir(), ".opencode", "system-prompts.json"),
   ].filter((p): p is string => !!p)
 }
-
-function parseJsonc(text: string): Config {
-  // strip // and /* */ comments, then JSON.parse
-  const stripped = text
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:"'])\/\/.*$/gm, "$1")
-  return JSON.parse(stripped) as Config
-}
 ```
+
+Config parsing is plain `JSON.parse`. No JSONC. The error-injection and log-writing logic (`reportError`, `injectErrorBlock`, the `lenient` branch) is omitted from this skeleton for brevity — see the build design doc for the full behavior matrix.
 
 Fill in any gaps as needed. The skeleton above is meant to be ~complete — a coding agent should be able to refine and ship it without redesigning the structure.
 
 ### Errors
 
-- Config file unreadable → `console.warn` once, treat as no-op.
-- Malformed JSON → warn, treat as no-op.
-- `promptFile` missing → warn, skip that rule.
-- Unknown `mode` → warn, skip that rule.
-- Rule with both `prompt` and `promptFile`, or neither → warn, skip.
-- **Never throw out of the hook.** opencode would surface it as a chat error.
+Default is **fail-loud**: every error injects a `<SYSTEM POLICY ERROR: ...>` block into `output.system` and appends a JSON line to `<config-dir>/system-prompt-override.log`. `"lenient": true` in the config root switches to warn-and-skip (logs still written).
+
+Triggers (both modes):
+
+- Config file unreadable
+- Malformed JSON
+- Rule with both `prompt` and `promptFile`, or neither
+- `promptFile` missing or unreadable
+- Unknown `mode`
+- Bad glob (regex compile fails)
+- Unexpected handler exception
+
+In every case: **never throw out of the hook.** opencode would otherwise surface it as a chat error. See the build design doc for the full behavior matrix and error-block format.
 
 ---
 
@@ -430,9 +436,11 @@ Use Bun's test runner (matches opencode's stack). Tests live in a `test/` direct
 8. `default` does NOT fire when at least one explicit rule matched.
 9. `promptFile` is loaded relative to the config file's directory.
 10. Missing config file → hook is no-op (`output.system` unchanged).
-11. Malformed JSON → warn, no-op.
-12. Rule with both `prompt` and `promptFile` → warn, skipped, other rules still apply.
+11. Malformed JSON → fail-loud injects `<SYSTEM POLICY ERROR>` block; `lenient: true` warns and no-ops.
+12. Rule with both `prompt` and `promptFile` → error block injected, other valid rules still apply.
 13. mtime cache: editing config between calls picks up the change without restart.
+14. Inline `prompt` containing `https://`, `//`, and `/* ... */` parses correctly (no JSONC stripping pitfalls).
+15. Log file at `<config-dir>/system-prompt-override.log` receives one JSON line per error event in both fail-loud and lenient modes.
 
 ### Integration test
 

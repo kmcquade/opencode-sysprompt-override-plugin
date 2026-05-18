@@ -1,0 +1,35 @@
+{
+  "name": "opencode-sysprompt-override",
+  "version": "0.1.0",
+  "description": "Override or extend opencode's per-model system prompt from a JSON config file",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "examples",
+    "SPEC.md",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "bun test ./test/",
+    "build": "bun build src/index.ts --target=bun --outdir=dist --format=esm && bun x tsc --emitDeclarationOnly --outDir dist",
+    "prepublishOnly": "make ci"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "*",
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}

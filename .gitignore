@@ -39,3 +39,17 @@ __pycache__/
 *.pyc
 
 repos/*
+
+# Node / Bun
+node_modules/
+dist/
+*.tsbuildinfo
+.bun/
+
+# Local logs
+system-prompt-override.log
+
+# Secrets
+.env
+.env.local
+.env.*.local

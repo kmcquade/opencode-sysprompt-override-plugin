@@ -1,0 +1,26 @@
+{
+  "$schema": "../schemas/system-prompts.schema.json",
+  "lenient": false,
+  "default": {
+    "mode": "append",
+    "prompt": "Be concise. No preamble."
+  },
+  "rules": [
+    {
+      "match": { "modelIDGlob": "qwen*" },
+      "mode": "replace",
+      "prompt": "You are a terse code assistant. Prefer tool calls over prose. Ask before destructive operations."
+    },
+    {
+      "match": { "providerID": "anthropic", "modelID": "claude-sonnet-4-6" },
+      "mode": "append",
+      "position": "end",
+      "prompt": "You are operating in a BeyondTrust security context. Follow least-privilege."
+    },
+    {
+      "match": { "providerIDGlob": "openai*" },
+      "mode": "append",
+      "promptFile": "./prompts/openai-policy.md"
+    }
+  ]
+}
