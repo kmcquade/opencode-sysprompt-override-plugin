@@ -1,3 +1,10 @@
+## [0.2.4](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.3...v0.2.4) (2026-05-30)
+
+
+### Bug Fixes
+
+* **ci:** bump setup-node to v6 + keep registry-url for npm OIDC ([#10](https://github.com/kmcquade/opencode-sysprompt-override-plugin/issues/10)) ([763f86c](https://github.com/kmcquade/opencode-sysprompt-override-plugin/commit/763f86c7a178bb2de5475495282b3025018ca0d5)), closes [actions/setup-node#1440](https://github.com/actions/setup-node/issues/1440)
+
 ## [0.2.3](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.2...v0.2.3) (2026-05-30)
 
 

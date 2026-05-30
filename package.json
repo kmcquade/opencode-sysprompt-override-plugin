@@ -1,6 +1,6 @@
 {
   "name": "opencode-sysprompt-override",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Override or extend opencode's per-model system prompt from a JSON config file",
   "license": "MIT",
   "type": "module",
