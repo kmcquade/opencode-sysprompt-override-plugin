@@ -148,14 +148,25 @@ A rule with no `match` (or empty `{}`) applies to every model.
 
 ## Error model
 
-The plugin's job is to enforce custom system instructions, so silent failure is the wrong default. By default it's **fail-loud**: any config or rule error injects a visible `<SYSTEM POLICY ERROR: ...>` block at the front of the system prompt, and appends a JSON line to `<config-dir>/system-prompt-override.log`.
+The plugin's job is to enforce custom system instructions, so silent failure is the wrong default. Every config or rule error is reported through **two always-on channels**, regardless of mode:
+
+1. A JSON line appended to `<config-dir>/system-prompt-override.log`.
+2. A single structured line written to **stderr** via `console.error`, so the error reaches the host process's stderr even when nobody reads the log file:
+
+   ```
+   [opencode-sysprompt-override] error code=promptfile-error ruleIndex=0 path=/ws/.opencode/system-prompts.json msg="ENOENT: ./prompts/missing.md"
+   ```
+
+   One line per unique `(code, path, ruleIndex)` — deduped, never loop-spammed — and it never contains prompt bodies or secrets, only the code, a short message, the path, and the rule index (`-` when not applicable).
+
+On top of that reporting, the default mode is **fail-loud**: any error also injects a visible `<SYSTEM POLICY ERROR: ...>` block at the front of the system prompt.
 
 ```
 <SYSTEM POLICY ERROR: promptfile-error: ENOENT: ./prompts/missing.md>
 The opencode-sysprompt-override plugin failed to apply this rule. See /path/to/system-prompt-override.log for details.
 ```
 
-Setting `"lenient": true` in the config root switches to warn-and-skip — no injected blocks, just a `console.warn` and the log line. Use lenient during config development if the visible blocks are noisy.
+Setting `"lenient": true` in the config root switches to skip-the-block — no injected `<SYSTEM POLICY ERROR>` blocks. Lenient governs **only** that block; the file log and the stderr line are emitted either way. Use lenient during config development if the visible blocks are noisy.
 
 The log file is append-only. Rotation is your responsibility.
 

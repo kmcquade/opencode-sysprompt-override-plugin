@@ -1,6 +1,23 @@
 import type { ErrorEvent } from "./types"
 import { writeLog } from "./log"
 
+// Collapse a message to a single line and escape quotes so the worker's
+// line-buffered stderr scanner can parse one record per newline cleanly.
+function formatStderrLine(
+  code: string,
+  message: string,
+  path: string | undefined,
+  ruleIndex: number | undefined,
+): string {
+  const safeMessage = message.replace(/[\r\n\t]+/g, " ").replace(/"/g, '\\"')
+  return (
+    `[opencode-sysprompt-override] error code=${code} ` +
+    `ruleIndex=${ruleIndex ?? "-"} ` +
+    `path=${path ?? "-"} ` +
+    `msg="${safeMessage}"`
+  )
+}
+
 export interface ErrorContext {
   logPath: string
   lenient: boolean
@@ -30,9 +47,10 @@ export function reportError(
       message,
     }
     writeLog(ctx.logPath, event)
-    if (ctx.lenient) {
-      console.warn(`[opencode-sysprompt-override] ${code}: ${message}`)
-    }
+    // Always surface the error to stderr, independent of lenient mode, so the
+    // OpenCode subprocess's stderr (the worker's only error egress) carries it.
+    // Lenient mode governs only the SYSTEM POLICY ERROR block injection below.
+    console.error(formatStderrLine(code, message, path, opts.ruleIndex))
   }
 
   if (!ctx.lenient) {
