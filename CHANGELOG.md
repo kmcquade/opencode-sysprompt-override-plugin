@@ -1,3 +1,10 @@
+## [0.2.3](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.2...v0.2.3) (2026-05-30)
+
+
+### Bug Fixes
+
+* **ci:** drop registry-url so npm publishes via OIDC, not a placeholder token ([#9](https://github.com/kmcquade/opencode-sysprompt-override-plugin/issues/9)) ([1a616cf](https://github.com/kmcquade/opencode-sysprompt-override-plugin/commit/1a616cf467d6d76cf1fa3f89f161c38283b36f22))
+
 ## [0.2.2](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.1...v0.2.2) (2026-05-30)
 
 
