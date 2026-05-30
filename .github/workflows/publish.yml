@@ -14,6 +14,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Must match the "Environment name" in the npm Trusted Publisher config.
+    # Without this, the GitHub OIDC token carries no environment claim and npm
+    # rejects the publish with a 404 on PUT.
+    environment: publish
     steps:
       - uses: actions/checkout@v4
         with:
