@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -7,6 +7,7 @@ import { reportError, flushErrors, type ErrorContext } from "../src/errors"
 let tmp: string
 let logPath: string
 let output: { system: string[] }
+let errSpy: ReturnType<typeof spyOn>
 
 function makeCtx(lenient: boolean): ErrorContext {
   return {
@@ -23,10 +24,12 @@ beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "errors-test-"))
   logPath = join(tmp, "log.jsonl")
   output = { system: ["original"] }
+  errSpy = spyOn(console, "error").mockImplementation(() => {})
 })
 
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true })
+  errSpy.mockRestore()
 })
 
 describe("reportError fail-loud (default)", () => {
@@ -86,6 +89,55 @@ describe("reportError lenient", () => {
     const ctx = makeCtx(true)
     reportError(ctx, "bad", "m")
     expect(existsSync(logPath)).toBe(true)
+  })
+})
+
+describe("reportError stderr reporting", () => {
+  it("emits one structured console.error line in fail-loud mode", () => {
+    const ctx = makeCtx(false)
+    reportError(ctx, "rule-invalid", "unknown mode: foo", { ruleIndex: 2 })
+    expect(errSpy).toHaveBeenCalledTimes(1)
+    expect(errSpy.mock.calls[0]![0]).toBe(
+      '[opencode-sysprompt-override] error code=rule-invalid ruleIndex=2 ' +
+        'path=/fake/config.json msg="unknown mode: foo"',
+    )
+  })
+
+  it("emits the stderr line in lenient mode too (reporting is independent of lenient)", () => {
+    const ctx = makeCtx(true)
+    reportError(ctx, "rule-invalid", "bad", { ruleIndex: 0 })
+    flushErrors(ctx)
+    // lenient suppresses the SYSTEM POLICY ERROR block...
+    expect(output.system).toEqual(["original"])
+    // ...but the stderr line is still emitted
+    expect(errSpy).toHaveBeenCalledTimes(1)
+    expect(errSpy.mock.calls[0]![0]).toContain(
+      "[opencode-sysprompt-override] error code=rule-invalid",
+    )
+  })
+
+  it("renders '-' for missing ruleIndex and path", () => {
+    const ctx = makeCtx(false)
+    ctx.configPath = undefined
+    reportError(ctx, "config-malformed", "bad json")
+    const line = errSpy.mock.calls[0]![0] as string
+    expect(line).toContain("ruleIndex=-")
+    expect(line).toContain("path=-")
+  })
+
+  it("collapses newlines/tabs and escapes quotes to keep the line single", () => {
+    const ctx = makeCtx(false)
+    reportError(ctx, "config-malformed", 'line1\nline2\tend "quoted"')
+    const line = errSpy.mock.calls[0]![0] as string
+    expect(line.split("\n").length).toBe(1)
+    expect(line).toContain('msg="line1 line2 end \\"quoted\\""')
+  })
+
+  it("emits only one stderr line per unique (code,path,ruleIndex)", () => {
+    const ctx = makeCtx(false)
+    reportError(ctx, "rule-invalid", "m", { ruleIndex: 1 })
+    reportError(ctx, "rule-invalid", "m", { ruleIndex: 1 })
+    expect(errSpy).toHaveBeenCalledTimes(1)
   })
 })
 

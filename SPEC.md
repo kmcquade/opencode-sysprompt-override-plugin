@@ -223,7 +223,7 @@ The user-facing config uses `modelID` as the field name (friendlier, matches the
 
 ### Root-level `lenient` flag
 
-Optional, defaults to `false`. Controls the error model — see the design doc and the README for the full behavior matrix. Short version: by default, config/rule errors inject a visible `<SYSTEM POLICY ERROR>` block into the system prompt and write to a log file. `"lenient": true` suppresses the injected blocks (warn + skip instead), preserving the log file.
+Optional, defaults to `false`. Controls the error model — see the design doc and the README for the full behavior matrix. Short version: by default, config/rule errors inject a visible `<SYSTEM POLICY ERROR>` block into the system prompt. `"lenient": true` suppresses **only** that injected block. The two reporting channels — the log file and a structured `console.error` line to stderr — are always on, in both modes.
 
 ### Stretch goal (not required for v1)
 
@@ -239,7 +239,7 @@ These resolve open questions from the previous spec draft:
 2. **`default` is a fallback, not an overlay.** It applies only when zero explicit rules matched. If you want a global overlay, write an explicit rule with empty `match: {}` (or omit `match`) — that gives "always apply" semantics and stacks with other rules.
 3. **Append at end is the default.** It preserves prompt-cache shape. `position: "start"` and `mode: "replace"` are available but documented as cache-breaking.
 4. **No hot-reload beyond mtime polling.** Use `fs.statSync` on the config path inside the hook and re-read if mtime changed. Cheap, no watchers.
-5. **No silent failures.** Every config error gets a `console.warn` with the rule index or path. Plugin never throws out of the hook.
+5. **No silent failures.** Every config error is reported unconditionally on two channels — a JSON line to the log file and one structured `console.error` line to stderr (`[opencode-sysprompt-override] error code=... ruleIndex=... path=... msg="..."`) — independent of `lenient`. Plugin never throws out of the hook.
 
 ---
 
@@ -404,7 +404,7 @@ Fill in any gaps as needed. The skeleton above is meant to be ~complete — a co
 
 ### Errors
 
-Default is **fail-loud**: every error injects a `<SYSTEM POLICY ERROR: ...>` block into `output.system` and appends a JSON line to `<config-dir>/system-prompt-override.log`. `"lenient": true` in the config root switches to warn-and-skip (logs still written).
+Default is **fail-loud**: every error injects a `<SYSTEM POLICY ERROR: ...>` block into `output.system`. Independent of mode, every error also appends a JSON line to `<config-dir>/system-prompt-override.log` **and** writes one structured `console.error` line to stderr. `"lenient": true` in the config root suppresses only the injected block (log line and stderr line still written).
 
 Triggers (both modes):
 
