@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.0...v0.2.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* **errors:** report every config/rule error to stderr via console.error ([#7](https://github.com/kmcquade/opencode-sysprompt-override-plugin/issues/7)) ([047ecb1](https://github.com/kmcquade/opencode-sysprompt-override-plugin/commit/047ecb141aaae7593897e0cebf4daa1fe958a89d))
+
 # [0.2.0](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.1.0...v0.2.0) (2026-05-18)
 
 
