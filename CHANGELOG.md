@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.1...v0.2.2) (2026-05-30)
+
+
+### Bug Fixes
+
+* **ci:** run publish job in the publish environment for npm OIDC ([#8](https://github.com/kmcquade/opencode-sysprompt-override-plugin/issues/8)) ([867bb33](https://github.com/kmcquade/opencode-sysprompt-override-plugin/commit/867bb330da662f406c2dcf73167999f718084dac))
+
 ## [0.2.1](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.0...v0.2.1) (2026-05-30)
 
 
