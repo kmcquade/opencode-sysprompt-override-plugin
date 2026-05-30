@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
+import * as os from "node:os"
 import { tmpdir } from "node:os"
 import { clearCache } from "../src/config"
 import plugin from "../src/index"
@@ -10,6 +11,10 @@ let opencodeDir: string
 let configPath: string
 let logPath: string
 let errSpy: ReturnType<typeof spyOn>
+// Sandbox home so the plugin's global config candidates can't pick up a real
+// ~/.config/opencode/system-prompts.json on a developer's machine.
+let fakeHome: string
+let homedirSpy: ReturnType<typeof spyOn>
 
 function stderrLines(): string[] {
   return errSpy.mock.calls.map((c) => String(c[0]))
@@ -45,6 +50,8 @@ function fakeCtx(directory: string) {
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "integration-test-"))
+  fakeHome = mkdtempSync(join(tmpdir(), "integration-test-home-"))
+  homedirSpy = spyOn(os, "homedir").mockReturnValue(fakeHome)
   opencodeDir = join(tmp, ".opencode")
   mkdirSync(opencodeDir, { recursive: true })
   configPath = join(opencodeDir, "system-prompts.json")
@@ -56,6 +63,8 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true })
+  rmSync(fakeHome, { recursive: true, force: true })
+  homedirSpy.mockRestore()
   clearCache()
   errSpy.mockRestore()
 })

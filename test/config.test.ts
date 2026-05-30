@@ -1,15 +1,23 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync } from "node:fs"
 import { join } from "node:path"
+import * as os from "node:os"
 import { tmpdir } from "node:os"
 import { loadConfigIfChanged, resolvePromptText, clearCache } from "../src/config"
 
 let tmp: string
 let opencodeDir: string
 let configPath: string
+// An empty sandbox standing in for the user's home dir, so the global config
+// candidates (~/.config/opencode, ~/.opencode) can't leak a real config on a
+// developer's machine. The fallback chain still runs — it just finds nothing.
+let fakeHome: string
+let homedirSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "config-test-"))
+  fakeHome = mkdtempSync(join(tmpdir(), "config-test-home-"))
+  homedirSpy = spyOn(os, "homedir").mockReturnValue(fakeHome)
   opencodeDir = join(tmp, ".opencode")
   mkdirSync(opencodeDir, { recursive: true })
   configPath = join(opencodeDir, "system-prompts.json")
@@ -19,6 +27,8 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true })
+  rmSync(fakeHome, { recursive: true, force: true })
+  homedirSpy.mockRestore()
   clearCache()
   delete process.env.OPENCODE_SYSTEM_PROMPT_CONFIG
 })
