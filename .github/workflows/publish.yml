@@ -28,10 +28,14 @@ jobs:
         with:
           bun-version: latest
 
+      # Deliberately NO registry-url: it makes setup-node write an .npmrc with a
+      # placeholder auth token (NODE_AUTH_TOKEN=XXXXX-XXXXX-XXXXX-XXXXX). With any
+      # token configured, npm uses token auth (garbage) and never attempts the
+      # OIDC handshake -> "404 Not Found - PUT". OIDC trusted publishing requires
+      # NO token at all; the default registry is npmjs.org, so we don't need it.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
 
       - name: Verify npm version (need >= 11.5 for trusted publishing)
         run: npm --version
