@@ -133,6 +133,21 @@ describe("reportError stderr reporting", () => {
     expect(line).toContain('msg="line1 line2 end \\"quoted\\""')
   })
 
+  it("escapes backslashes so a trailing backslash can't break out of the msg field", () => {
+    const ctx = makeCtx(false)
+    // A message ending in a lone backslash: without escaping `\`, the closing
+    // quote of msg="…" would become `\"` (an escaped quote), letting the field
+    // bleed into spurious key=value tokens. Doubling backslashes prevents it.
+    reportError(ctx, "config-malformed", "win path C:\\tmp\\")
+    const line = errSpy.mock.calls[0]![0] as string
+    expect(line).toContain('msg="win path C:\\\\tmp\\\\"')
+    // Sanity: a combined backslash+quote message round-trips unambiguously.
+    const ctx2 = makeCtx(false)
+    reportError(ctx2, "config-malformed", 'a\\"b')
+    const line2 = errSpy.mock.calls[1]![0] as string
+    expect(line2).toContain('msg="a\\\\\\"b"')
+  })
+
   it("emits only one stderr line per unique (code,path,ruleIndex)", () => {
     const ctx = makeCtx(false)
     reportError(ctx, "rule-invalid", "m", { ruleIndex: 1 })
