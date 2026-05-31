@@ -1,15 +1,23 @@
 import type { ErrorEvent } from "./types"
 import { writeLog } from "./log"
 
-// Collapse a message to a single line and escape quotes so the worker's
-// line-buffered stderr scanner can parse one record per newline cleanly.
+// Collapse a message to a single line and escape backslashes + quotes so the
+// worker's line-buffered stderr scanner can parse one record per newline
+// cleanly. Backslashes MUST be escaped before quotes: otherwise the `\` we add
+// when escaping a `"` would itself be doubled, and — more importantly — a
+// message ending in a lone backslash would turn the closing `"` of the msg
+// field into an escaped quote, letting crafted error text break out of
+// `msg="…"` and inject spurious key=value tokens (CWE-116 incomplete escaping).
 function formatStderrLine(
   code: string,
   message: string,
   path: string | undefined,
   ruleIndex: number | undefined,
 ): string {
-  const safeMessage = message.replace(/[\r\n\t]+/g, " ").replace(/"/g, '\\"')
+  const safeMessage = message
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
   return (
     `[opencode-sysprompt-override] error code=${code} ` +
     `ruleIndex=${ruleIndex ?? "-"} ` +
