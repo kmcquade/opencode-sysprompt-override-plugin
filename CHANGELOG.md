@@ -1,3 +1,10 @@
+## [0.2.5](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.4...v0.2.5) (2026-05-31)
+
+
+### Bug Fixes
+
+* **errors:** escape backslashes before quotes in formatStderrLine ([#13](https://github.com/kmcquade/opencode-sysprompt-override-plugin/issues/13)) ([a298d8a](https://github.com/kmcquade/opencode-sysprompt-override-plugin/commit/a298d8a1458b18feeb5a090161b02715c0612cfa))
+
 ## [0.2.4](https://github.com/kmcquade/opencode-sysprompt-override-plugin/compare/v0.2.3...v0.2.4) (2026-05-30)
 
 
