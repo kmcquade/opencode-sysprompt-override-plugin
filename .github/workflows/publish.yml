@@ -56,4 +56,8 @@ jobs:
       - name: Release (semantic-release)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Token auth (reliable) instead of OIDC trusted publishing. registry-url
+          # makes setup-node write //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN};
+          # this supplies the real token. --provenance still signs via id-token.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
