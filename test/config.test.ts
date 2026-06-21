@@ -204,10 +204,8 @@ describe("loadConfigIfChanged", () => {
       rules: [{ mode: "replace", prompt: "p" }],
     }))
     const loaded = loadConfigIfChanged(tmp)
-    // JSON.parse produces number 42, but the ?? operator treats 42 as non-nullish,
-    // so the raw number 42 would be stored. This is a type-contract violation
-    // caught by TypeScript at build time.
-    expect(loaded!.dynamicBoundaryMarker).toBe(42 as any)
+    expect(loaded!.dynamicBoundaryMarker).toBe("\nYou are powered by the model named")
+    expect(loaded!.dynamicFallbackMarker).toBe("\n<env>")
   })
 })
 

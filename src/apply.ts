@@ -32,7 +32,8 @@ export function applyRule(
         dynamicFallbackMarker,
       )
       if (boundary !== -1) {
-        output.system[0] = text + fullPrompt.slice(boundary)
+        const spliced = text + fullPrompt.slice(boundary)
+        output.system.splice(0, output.system.length, spliced)
         return
       }
     }

@@ -55,14 +55,13 @@ describe("applyRule", () => {
 
   it("replace with preserveDynamic keeps dynamic section when boundary found", () => {
     const dynamicTail = `${DEFAULT_DYNAMIC_BOUNDARY} llama-9000`
-    const out = { system: ["some static prompt" + dynamicTail] }
+    const out = { system: ["some static prompt" + dynamicTail, "extra"] }
     applyRule(
       rule({ mode: "replace", position: "end", preserveDynamic: true }),
       "REPLACED",
       out,
     )
-    expect(out.system[0]).toBe("REPLACED" + dynamicTail)
-  })
+    expect(out.system).toEqual(["REPLACED" + dynamicTail])
 
   it("replace with preserveDynamic falls back to full splice when no boundary found", () => {
     const out = { system: ["no boundary marker here", "extra"] }

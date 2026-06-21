@@ -90,8 +90,8 @@ export function loadConfigIfChanged(projectDir: string): LoadedConfig | null {
   const loaded: LoadedConfig = {
     path: found, dir, logPath, mtimeMs: st.mtimeMs,
     cfg, parsedRules, parsedDefault, errors, seen,
-    dynamicBoundaryMarker: cfg.dynamicBoundaryMarker ?? DEFAULT_DYNAMIC_BOUNDARY,
-    dynamicFallbackMarker: cfg.dynamicFallbackMarker ?? DEFAULT_FALLBACK_DYNAMIC_BOUNDARY,
+    dynamicBoundaryMarker: typeof cfg.dynamicBoundaryMarker === "string" ? cfg.dynamicBoundaryMarker : DEFAULT_DYNAMIC_BOUNDARY,
+    dynamicFallbackMarker: typeof cfg.dynamicFallbackMarker === "string" ? cfg.dynamicFallbackMarker : DEFAULT_FALLBACK_DYNAMIC_BOUNDARY,
   }
   cached = loaded
   return loaded
