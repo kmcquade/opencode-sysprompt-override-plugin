@@ -12,12 +12,15 @@ export interface Rule {
   match?: MatchSpec
   mode: Mode
   position?: Position
+  preserveDynamic?: boolean
   prompt?: string
   promptFile?: string
 }
 
 export interface Config {
   lenient?: boolean
+  dynamicBoundaryMarker?: string
+  dynamicFallbackMarker?: string
   default?: Omit<Rule, "match">
   rules?: Rule[]
 }
@@ -48,6 +51,7 @@ export interface ParsedRule {
   match: CompiledMatch   // empty object {} = match-all
   mode: Mode
   position: Position
+  preserveDynamic: boolean
   prompt?: string
   promptFile?: string
 }
