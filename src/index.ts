@@ -55,7 +55,7 @@ function transform(
       reportError(errCtx, "promptfile-error", String(err), { ruleIndex: rule.index })
       continue
     }
-    applyRule(rule, text, output)
+    applyRule(rule, text, output, loaded.dynamicBoundaryMarker, loaded.dynamicFallbackMarker)
   }
 
   if (matched.length === 0 && loaded.parsedDefault) {
@@ -67,7 +67,7 @@ function transform(
       flushErrors(errCtx)
       return
     }
-    applyRule(loaded.parsedDefault, text, output)
+    applyRule(loaded.parsedDefault, text, output, loaded.dynamicBoundaryMarker, loaded.dynamicFallbackMarker)
   }
 
   flushErrors(errCtx)

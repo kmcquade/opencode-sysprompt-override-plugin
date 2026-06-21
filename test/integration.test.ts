@@ -5,6 +5,12 @@ import * as os from "node:os"
 import { tmpdir } from "node:os"
 import { clearCache } from "../src/config"
 import plugin from "../src/index"
+import { DEFAULT_DYNAMIC_BOUNDARY } from "../src/constants"
+
+/** Wraps a static prompt with a realistic dynamic tail. */
+function withDynamicTail(staticPart: string): string {
+  return staticPart + DEFAULT_DYNAMIC_BOUNDARY + " claude-sonnet-4-6\n\n<env>\n  <var name=\"TZ\">UTC</var>\n</env>\n\nYou are a helpful assistant.\n\n# Tools\n\n" + Array.from({ length: 10 }, (_, i) => `  - Tool ${i + 1}`).join("\n")
+}
 
 let tmp: string
 let opencodeDir: string
@@ -208,5 +214,101 @@ describe("plugin end-to-end", () => {
       output,
     )
     expect(output.system).toEqual(["original"])
+  })
+
+  it("replace with preserveDynamic=true preserves the dynamic tail", async () => {
+    writeFileSync(configPath, JSON.stringify({
+      rules: [
+        { match: {}, mode: "replace", preserveDynamic: true, prompt: "CUSTOM" },
+      ],
+    }))
+    const original = withDynamicTail("original")
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: [original] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system[0]).toBe("CUSTOM" + original.slice(original.indexOf(DEFAULT_DYNAMIC_BOUNDARY)))
+  })
+
+  it("replace with preserveDynamic=false (default) does full replace", async () => {
+    writeFileSync(configPath, JSON.stringify({
+      rules: [
+        { match: {}, mode: "replace", prompt: "CUSTOM" },
+      ],
+    }))
+    const original = withDynamicTail("original")
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: [original] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system).toEqual(["CUSTOM"])
+  })
+
+  it("replace with preserveDynamic=true falls back gracefully when no boundary", async () => {
+    writeFileSync(configPath, JSON.stringify({
+      rules: [
+        { match: {}, mode: "replace", preserveDynamic: true, prompt: "CUSTOM" },
+      ],
+    }))
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: ["no boundary marker here"] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system).toEqual(["CUSTOM"])
+  })
+
+  it("replace with preserveDynamic=true respects custom dynamicBoundaryMarker", async () => {
+    // JSON "\n" is a real newline character, matching the expected marker format.
+    writeFileSync(configPath, JSON.stringify({
+      dynamicBoundaryMarker: "\nCUSTOM_BOUNDARY",
+      rules: [
+        { match: {}, mode: "replace", preserveDynamic: true, prompt: "CUSTOM" },
+      ],
+    }))
+    const dynamicTail = "\nCUSTOM_BOUNDARY model-x\n\n<env>...</env>"
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: ["original" + dynamicTail] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system[0]).toBe("CUSTOM" + dynamicTail)
+  })
+
+  it("replace with preserveDynamic=true respects custom dynamicFallbackMarker", async () => {
+    writeFileSync(configPath, JSON.stringify({
+      dynamicFallbackMarker: "\n<custom-env>",
+      rules: [
+        { match: {}, mode: "replace", preserveDynamic: true, prompt: "CUSTOM" },
+      ],
+    }))
+    const dynamicTail = "\n<custom-env>production"
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: ["original" + dynamicTail] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system[0]).toBe("CUSTOM" + dynamicTail)
+  })
+
+  it("default rule with preserveDynamic=true preserves dynamic tail", async () => {
+    writeFileSync(configPath, JSON.stringify({
+      default: { mode: "replace", preserveDynamic: true, prompt: "DEFAULT" },
+    }))
+    const original = withDynamicTail("original")
+    const hooks = await plugin(fakeCtx(tmp))
+    const output = { system: [original] }
+    await hooks["experimental.chat.system.transform"]!(
+      { model: qwen } as any,
+      output,
+    )
+    expect(output.system[0]).toBe("DEFAULT" + original.slice(original.indexOf(DEFAULT_DYNAMIC_BOUNDARY)))
   })
 })

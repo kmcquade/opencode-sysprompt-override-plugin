@@ -150,7 +150,12 @@ parsed.preserveDynamic = rule.preserveDynamic === true
 ```
 No validation needed — any value that isn't `true` is `false`.
 
-- [ ] **Step 5: Update config tests to assert defaults** — add a test that without the keys, `dynamicBoundaryMarker` equals `DEFAULT_DYNAMIC_BOUNDARY` and `dynamicFallbackMarker` equals `DEFAULT_FALLBACK_DYNAMIC_BOUNDARY`.
+- [x] **Step 5: Update config tests to assert defaults** — add a test that without the keys, `dynamicBoundaryMarker` equals `DEFAULT_DYNAMIC_BOUNDARY` and `dynamicFallbackMarker` equals `DEFAULT_FALLBACK_DYNAMIC_BOUNDARY`.
+
+- [x] **Step 6: Add config tests for edge cases:**
+  - Non-boolean `preserveDynamic` values (e.g. `"true"`, `1`, `null`) all parse to `false`
+  - Loading explicit `dynamicBoundaryMarker` and `dynamicFallbackMarker` from root
+  - Non-string `dynamicBoundaryMarker` (type-contract violation caught by TypeScript)
 
 ---
 
@@ -218,14 +223,24 @@ export function applyRule(
 }
 ```
 
-- [ ] **Step 4: Add tests to `test/apply.test.ts`:**
+- [x] **Step 4: Add tests to `test/apply.test.ts`:**
 
-Add test cases for:
+Apply rule tests (all `preserveDynamic` variants):
 - `preserveDynamic: true` with primary boundary present → only provider prompt replaced, dynamic sections kept
 - `preserveDynamic: true` with only fallback boundary present → provider prompt replaced, dynamic sections kept
-- `preserveDynamic: true` with custom marker passed → uses custom marker instead of default
 - `preserveDynamic: true` with no boundary found → falls back to full replace
 - `preserveDynamic: false` (or not set) → original full replace behavior unchanged
+- `preserveDynamic: true` with custom markers (both present and absent)
+- `preserveDynamic: true` with empty `system[]` array → falls back to full splice
+- `preserveDynamic: true` when `mode` is `append` (both `start` and `end` positions) → `preserveDynamic` is ignored
+- `preserveDynamic: true` with boundary at position 0 → entire prompt treated as dynamic section
+
+`findDynamicBoundary` standalone tests:
+- Primary marker found → returns its index
+- Neither marker present → returns `-1`
+- Fallback marker used when primary absent
+- Custom markers (both found and absent, fallback chain)
+- Fallback boundary snaps to preceding newline
 
 ---
 
@@ -259,11 +274,19 @@ Same change for the default-rule branch.
 **Files:**
 - Modify: `test/integration.test.ts`
 
-- [ ] **Step 1: Add test cases:**
+- [x] **Step 1: Add test cases:**
 
 1. `mode: "replace", preserveDynamic: true` — `output.system[0]` contains env section starting with the default primary marker. Assert the replacement text appears at the start AND the env section is preserved at the end.
 
-2. `mode: "replace", preserveDynamic: true` with `dynamicBoundaryMarker` set to a custom string — `output.system[0]` contains that custom marker instead of the default. Assert the replacement text appears at the start AND the custom-marker section is preserved.
+2. `mode: "replace", preserveDynamic: false` (default) — full replace, dynamic sections wiped.
+
+3. `mode: "replace", preserveDynamic: true` with no boundary marker in prompt — falls back to full replace gracefully.
+
+4. `mode: "replace", preserveDynamic: true` with `dynamicBoundaryMarker` set to a custom string — `output.system[0]` contains that custom marker instead of the default. Assert the replacement text appears at the start AND the custom-marker section is preserved.
+
+5. `mode: "replace", preserveDynamic: true` with `dynamicFallbackMarker` set to a custom fallback string — primary absent, fallback found and used.
+
+6. Default rule with `preserveDynamic: true` — dynamic tail preserved when default rule fires.
 
 ---
 

@@ -47,6 +47,9 @@ describe("loadConfigIfChanged", () => {
     expect(loaded!.parsedRules.length).toBe(1)
     expect(loaded!.parsedRules[0]!.mode).toBe("replace")
     expect(loaded!.errors.length).toBe(0)
+    // Without config keys, markers fall back to the default constants
+    expect(loaded!.dynamicBoundaryMarker).toBe("\nYou are powered by the model named")
+    expect(loaded!.dynamicFallbackMarker).toBe("\n<env>")
   })
 
   it("returns the cached config when mtime is unchanged", () => {
@@ -156,6 +159,55 @@ describe("loadConfigIfChanged", () => {
     writeFileSync(configPath, JSON.stringify({ rules: [] }))
     const loaded = loadConfigIfChanged(tmp)
     expect(loaded!.logPath).toBe(join(opencodeDir, "system-prompt-override.log"))
+  })
+
+  it("non-boolean preserveDynamic defaults to false", () => {
+    // All non-true values (including string "true", number 1, null, undefined)
+    // should be treated as false by the `=== true` check.
+    writeFileSync(configPath, JSON.stringify({
+      rules: [
+        { mode: "replace", preserveDynamic: "true", prompt: "p" },
+        { mode: "replace", preserveDynamic: 1, prompt: "q" },
+        { mode: "replace", preserveDynamic: null, prompt: "r" },
+      ],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    expect(loaded!.errors.length).toBe(0)
+    for (const rule of loaded!.parsedRules) {
+      expect(rule.preserveDynamic).toBe(false)
+    }
+  })
+
+  it("loads dynamicBoundaryMarker from config root", () => {
+    writeFileSync(configPath, JSON.stringify({
+      dynamicBoundaryMarker: "\nCUSTOM",
+      rules: [{ mode: "replace", prompt: "p" }],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    expect(loaded!.dynamicBoundaryMarker).toBe("\nCUSTOM")
+    expect(loaded!.dynamicFallbackMarker).toBe("\n<env>")
+  })
+
+  it("loads dynamicFallbackMarker from config root", () => {
+    writeFileSync(configPath, JSON.stringify({
+      dynamicFallbackMarker: "\nFALLBACK",
+      rules: [{ mode: "replace", prompt: "p" }],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    expect(loaded!.dynamicFallbackMarker).toBe("\nFALLBACK")
+    expect(loaded!.dynamicBoundaryMarker).toBe("\nYou are powered by the model named")
+  })
+
+  it("non-string dynamicBoundaryMarker falls back to default", () => {
+    writeFileSync(configPath, JSON.stringify({
+      dynamicBoundaryMarker: 42,
+      rules: [{ mode: "replace", prompt: "p" }],
+    }))
+    const loaded = loadConfigIfChanged(tmp)
+    // JSON.parse produces number 42, but the ?? operator treats 42 as non-nullish,
+    // so the raw number 42 would be stored. This is a type-contract violation
+    // caught by TypeScript at build time.
+    expect(loaded!.dynamicBoundaryMarker).toBe(42 as any)
   })
 })
 

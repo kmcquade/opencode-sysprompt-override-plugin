@@ -10,6 +10,14 @@
       "default": false,
       "description": "If true, errors warn-and-skip silently instead of injecting a visible policy-error block into the system prompt. Logs are always written."
     },
+    "dynamicBoundaryMarker": {
+      "type": "string",
+      "description": "Primary marker string that separates the static prompt from opencode's runtime-generated dynamic sections. Default: '\\nYou are powered by the model named'."
+    },
+    "dynamicFallbackMarker": {
+      "type": "string",
+      "description": "Fallback marker used when the primary marker is absent. Default: '\\n<env>'."
+    },
     "default": {
       "$ref": "#/definitions/RuleBody",
       "description": "Rule applied when no explicit rule matched. No `match` field."
@@ -37,6 +45,11 @@
       "properties": {
         "mode": { "type": "string", "enum": ["append", "replace"] },
         "position": { "type": "string", "enum": ["start", "end"], "default": "end" },
+        "preserveDynamic": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true and mode is 'replace', keeps opencode's runtime-generated dynamic sections (env, instructions, skills) by splicing only the static portion of the prompt."
+        },
         "prompt": { "type": "string" },
         "promptFile": { "type": "string" }
       },
@@ -53,6 +66,11 @@
         "match": { "$ref": "#/definitions/MatchSpec" },
         "mode": { "type": "string", "enum": ["append", "replace"] },
         "position": { "type": "string", "enum": ["start", "end"], "default": "end" },
+        "preserveDynamic": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true and mode is 'replace', keeps opencode's runtime-generated dynamic sections (env, instructions, skills) by splicing only the static portion of the prompt."
+        },
         "prompt": { "type": "string" },
         "promptFile": { "type": "string" }
       },
