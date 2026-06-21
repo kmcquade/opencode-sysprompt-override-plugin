@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path"
 import { homedir } from "node:os"
 import type { Config, ParsedRule, Rule } from "./types"
 import { compileMatch } from "./match"
+import { DEFAULT_DYNAMIC_BOUNDARY, DEFAULT_FALLBACK_DYNAMIC_BOUNDARY } from "./constants"
 
 export interface LoadedConfig {
   path: string
@@ -14,6 +15,8 @@ export interface LoadedConfig {
   parsedDefault: ParsedRule | null
   errors: Array<{ code: string; message: string; ruleIndex?: number }>
   seen: Set<string>
+  dynamicBoundaryMarker: string
+  dynamicFallbackMarker: string
 }
 
 let cached: LoadedConfig | null = null
@@ -42,6 +45,8 @@ export function loadConfigIfChanged(projectDir: string): LoadedConfig | null {
       cfg: {}, parsedRules: [], parsedDefault: null,
       errors: [{ code: "config-unreadable", message: String(err) }],
       seen,
+      dynamicBoundaryMarker: DEFAULT_DYNAMIC_BOUNDARY,
+      dynamicFallbackMarker: DEFAULT_FALLBACK_DYNAMIC_BOUNDARY,
     }
     cached = failed
     return failed
@@ -56,6 +61,8 @@ export function loadConfigIfChanged(projectDir: string): LoadedConfig | null {
       cfg: {}, parsedRules: [], parsedDefault: null,
       errors: [{ code: "config-malformed", message: String(err) }],
       seen,
+      dynamicBoundaryMarker: DEFAULT_DYNAMIC_BOUNDARY,
+      dynamicFallbackMarker: DEFAULT_FALLBACK_DYNAMIC_BOUNDARY,
     }
     cached = failed
     return failed
@@ -83,6 +90,8 @@ export function loadConfigIfChanged(projectDir: string): LoadedConfig | null {
   const loaded: LoadedConfig = {
     path: found, dir, logPath, mtimeMs: st.mtimeMs,
     cfg, parsedRules, parsedDefault, errors, seen,
+    dynamicBoundaryMarker: cfg.dynamicBoundaryMarker ?? DEFAULT_DYNAMIC_BOUNDARY,
+    dynamicFallbackMarker: cfg.dynamicFallbackMarker ?? DEFAULT_FALLBACK_DYNAMIC_BOUNDARY,
   }
   cached = loaded
   return loaded
@@ -109,6 +118,7 @@ function parseRule(rule: Rule, index: number): ParsedRule {
     match: compileMatch(rule.match),
     mode: rule.mode,
     position: rule.position ?? "end",
+    preserveDynamic: rule.preserveDynamic === true,
   }
   if (rule.prompt !== undefined) parsed.prompt = rule.prompt
   if (rule.promptFile !== undefined) parsed.promptFile = rule.promptFile
