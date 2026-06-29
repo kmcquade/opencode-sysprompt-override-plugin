@@ -53,7 +53,7 @@ Want to undo it? Delete `.opencode/plugin/system-prompt-override.js`. Want to ch
 
 The hot-dog demo is silly, but the pattern is real. opencode ships a different base prompt for each model family (`anthropic.txt`, `gpt.txt`, `gemini.txt`, `kimi.txt`, `trinity.txt`, `default.txt`). There's no built-in way to override or extend them per-model. This plugin gives you that knob:
 
-- **Replace the prompt** for one model (or a glob of models). `mode: "replace"` wipes opencode's base; you write the whole thing.
+- **Replace the prompt** for one model (or a glob of models). `mode: "replace"` wipes opencode's static base; set `"preserveDynamic": true` on the rule to keep the runtime-generated sections (env, instructions, skills) intact.
 - **Append to the prompt** — leave opencode's prompt intact, add your own rules at the end. `mode: "append"` is what you want most of the time.
 - **Layer a global overlay** on every model — write a rule with no `match`, it applies to all of them.
 - **Customize models opencode doesn't have a baked-in prompt for** (deepseek, llama, your local Ollama setup, anything that falls through to `default.txt`).
@@ -106,6 +106,7 @@ The config is **strict JSON** — no comments, no trailing commas. (Comment-stri
     {
       "match": { "modelIDGlob": "qwen*" },
       "mode": "replace",
+      "preserveDynamic": true,
       "prompt": "You are a terse code assistant."
     },
     {
@@ -122,6 +123,8 @@ The config is **strict JSON** — no comments, no trailing commas. (Comment-stri
 
 **Root:**
 - `lenient` (boolean, default `false`) — see "Error model" below.
+- `dynamicBoundaryMarker` (string) — primary marker string that separates opencode's static prompt from its runtime-generated dynamic sections (env, instructions, skills). When `preserveDynamic` is enabled, the plugin searches for this marker to determine the splice boundary. Default: `"\nYou are powered by the model named"`.
+- `dynamicFallbackMarker` (string) — fallback marker used when the primary marker is not found in the prompt. Default: `"\n<env>"`.
 - `default` — rule applied when no explicit rule matched (no `match` field).
 - `rules` — ordered list of rules.
 
@@ -136,6 +139,7 @@ A rule with no `match` (or empty `{}`) applies to every model.
 **Rule body:**
 - `mode` — `"append"` adds to the existing system prompt; `"replace"` wipes opencode's base prompt and substitutes yours.
 - `position` — `"end"` (default) or `"start"`. Only meaningful for `append`.
+- `preserveDynamic` (boolean, default `false`) — when true and `mode` is `"replace"`, the replacement splices only the static portion of the prompt, preserving opencode's runtime-generated dynamic sections (env, AGENTS.md instructions, skills listing). The boundary is detected using the root-level `dynamicBoundaryMarker` / `dynamicFallbackMarker`. When the boundary is not found, falls back to a full replace.
 - Exactly one of:
   - `prompt` — inline string.
   - `promptFile` — path to a file (relative to the config's directory, or absolute).
@@ -173,7 +177,7 @@ The log file is append-only. Rotation is your responsibility.
 ## Caveats
 
 1. The hook is `experimental.chat.system.transform`. opencode may rename it without a major-version bump. Pin your opencode version if this matters.
-2. `mode: "replace"` discards opencode's per-model base prompt — those include tool-use instructions the agent relies on. Prefer `append` unless you're starting from a copy of opencode's prompt like the demo above.
+2. `mode: "replace"` discards opencode's per-model base prompt — those include tool-use instructions the agent relies on. Set `"preserveDynamic": true` on the rule to keep the runtime-generated dynamic sections (env, instructions, skills) intact, or prefer `append` unless you're starting from a copy of opencode's prompt like the demo above.
 3. `append` with `position: "end"` (the default) preserves opencode's 2-part prompt-cache header. `position: "start"` and `mode: "replace"` modify `system[0]`, which skips opencode's rejoin and changes cache shape.
 4. The hook fires on every LLM call — chat turns, agent sub-runs, HTTP server requests alike.
 
