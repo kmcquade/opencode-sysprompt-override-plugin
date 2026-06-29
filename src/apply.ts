@@ -20,12 +20,12 @@ export function applyRule(
   rule: ParsedRule,
   text: string,
   output: { system: string[] },
-  dynamicBoundaryMarker?: string,
-  dynamicFallbackMarker?: string,
+  dynamicBoundaryMarker: string = DEFAULT_DYNAMIC_BOUNDARY,
+  dynamicFallbackMarker: string = DEFAULT_FALLBACK_DYNAMIC_BOUNDARY,
 ): void {
   if (rule.mode === "replace") {
     if (rule.preserveDynamic) {
-      const fullPrompt = output.system[0] || ''
+      const fullPrompt = output.system[0] || ""
       const boundary = findDynamicBoundary(
         fullPrompt,
         dynamicBoundaryMarker,

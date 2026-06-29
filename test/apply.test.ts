@@ -62,6 +62,7 @@ describe("applyRule", () => {
       out,
     )
     expect(out.system).toEqual(["REPLACED" + dynamicTail])
+  })
 
   it("replace with preserveDynamic falls back to full splice when no boundary found", () => {
     const out = { system: ["no boundary marker here", "extra"] }
